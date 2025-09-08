@@ -6,6 +6,7 @@ from backend.models import User, Shop, Category, Product, ProductInfo, ConfirmEm
 import yaml
 from django.db import transaction
 import json
+from unittest.mock import patch
 
 
 class APITests(APITestCase):
@@ -243,3 +244,46 @@ class APITests(APITestCase):
         self.assertEqual(view_orders_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(view_orders_response.json()), 1) # Expecting one order
         self.assertEqual(view_orders_response.json()[0]['state'], 'new')
+
+    @patch('backend.signals.EmailMultiAlternatives')
+    def test_new_order_email_sent(self, mock_email):
+        """Проверяет, что при создании нового заказа отправляется email."""
+        self.client.force_authenticate(user=self.buyer_user)
+        # 1. Add a contact
+        contact_url = reverse('backend:user-contact')
+        contact_data = {
+            'city': 'Test City',
+            'street': 'Test Street',
+            'phone': '+79998887766',
+            'house': '1',
+        }
+        self.client.post(contact_url, contact_data, format='json')
+        contacts_list_response = self.client.get(contact_url)
+        contact_id = contacts_list_response.json()[0]['id']
+
+        # 2. Add items to basket
+        basket_url = reverse('backend:basket')
+        items_data = [{'product_info': self.product_info.id, 'quantity': 5}]
+        self.client.post(basket_url, {'items': json.dumps(items_data)}, format='json')
+        basket_get_response = self.client.get(basket_url)
+        basket_id = basket_get_response.json()[0]['id']
+
+        # 3. Confirm the order
+        order_url = reverse('backend:order')
+        order_confirm_data = {
+            'id': basket_id,
+            'contact': contact_id,
+        }
+        self.client.post(order_url, order_confirm_data, format='json')
+
+        # 4. Assert that the email was sent
+        mock_email.assert_called_once()
+        mock_email.return_value.send.assert_called_once()
+
+        # call_args is a tuple of (args, kwargs)
+        args, kwargs = mock_email.call_args
+        
+        # Check positional arguments
+        self.assertEqual(args[0], 'Обновление статуса заказа') # subject
+        self.assertEqual(args[3], [self.buyer_user.email])   # to
+        
