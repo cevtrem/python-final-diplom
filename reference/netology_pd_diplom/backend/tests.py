@@ -10,11 +10,8 @@ import json
 
 class APITests(APITestCase):
 
-
     def setUp(self):
-
         """Настраивает тестовые данные для всех тестов."""
-
         self.buyer_user = User.objects.create_user(email='buyer@example.com', password='password123', type='buyer')
         self.shop_user = User.objects.create_user(email='shop@example.com', password='password123', type='shop')
 
@@ -49,9 +46,7 @@ class APITests(APITestCase):
 
 
     def test_user_registration(self):
-
         """Проверяет успешную регистрацию нового пользователя."""
-
         url = reverse('backend:user-register')
         data = {
             'email': 'newuser@example.com',
@@ -67,9 +62,7 @@ class APITests(APITestCase):
 
 
     def test_user_login(self):
-
         """Проверяет авторизацию пользователя после регистрации и подтверждения."""
-
         # First, register a new user
         register_url = reverse('backend:user-register')
         user_data = {
@@ -103,9 +96,7 @@ class APITests(APITestCase):
 
 
     def test_category_view(self):
-
         """Проверяет получение списка категорий."""
-
         url = reverse('backend:categories')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -113,9 +104,7 @@ class APITests(APITestCase):
 
 
     def test_shop_view(self):
-
         """Проверяет получение списка магазинов."""
-
         url = reverse('backend:shops')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -123,9 +112,7 @@ class APITests(APITestCase):
 
 
     def test_product_info_view(self):
-
         """Проверяет получение информации о продуктах."""
-
         url = reverse('backend:products')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -133,18 +120,14 @@ class APITests(APITestCase):
 
 
     def test_basket_view_unauthenticated(self):
-
         """Проверяет доступ к корзине для неавторизованного пользователя."""
-
         url = reverse('backend:basket')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
     def test_basket_view_authenticated(self):
-
         """Проверяет доступ к корзине для авторизованного пользователя."""
-
         self.client.force_authenticate(user=self.buyer_user)
         url = reverse('backend:basket')
         response = self.client.get(url)
@@ -152,20 +135,15 @@ class APITests(APITestCase):
 
 
     def test_partner_update_unauthorized(self):
-
         """Проверяет доступ к обновлению прайс-листа для неавторизованного пользователя."""
-
         self.client.force_authenticate(user=self.buyer_user)
         url = reverse('backend:partner-update')
         data = {'url': 'http://example.com/price.yaml'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-
     def test_add_multiple_items_to_basket_from_different_shops(self):
-
         """Проверяет добавление нескольких товаров из разных магазинов в корзину."""
-
         self.client.force_authenticate(user=self.buyer_user)
         url = reverse('backend:basket')
         items_data = [
@@ -181,3 +159,50 @@ class APITests(APITestCase):
         basket_response = self.client.get(url)
         self.assertEqual(basket_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(basket_response.json()[0]['ordered_items']), 2)
+
+    def test_confirm_order_with_address(self):
+        """Проверяет подтверждение заказа с вводом адреса доставки."""
+        self.client.force_authenticate(user=self.buyer_user)
+        # 1. Add a contact
+        contact_url = reverse('backend:user-contact')
+        contact_data = {
+            'city': 'Москва',
+            'street': 'Ленина',
+            'phone': '+79001234567',
+            'house': '10',
+            'apartment': '5',
+        }
+        contact_response = self.client.post(contact_url, contact_data, format='json')
+        self.assertEqual(contact_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(contact_response.json()['Status'])
+
+        # Get the contact ID
+        contacts_list_response = self.client.get(contact_url)
+        contact_id = contacts_list_response.json()[0]['id']
+
+        # 2. Add items to basket
+        basket_url = reverse('backend:basket')
+        items_data = [
+            {'product_info': self.product_info.id, 'quantity': 1},
+        ]
+        basket_add_response = self.client.post(basket_url, {'items': json.dumps(items_data)}, format='json')
+        self.assertEqual(basket_add_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(basket_add_response.json()['Status'])
+
+        # Get the basket ID
+        basket_get_response = self.client.get(basket_url)
+        basket_id = basket_get_response.json()[0]['id']
+
+        # 3. Confirm the order
+        order_url = reverse('backend:order')
+        order_confirm_data = {
+            'id': basket_id,
+            'contact': contact_id,
+        }
+        order_confirm_response = self.client.post(order_url, order_confirm_data, format='json')
+        self.assertEqual(order_confirm_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(order_confirm_response.json()['Status'])
+
+        # Verify order status is 'new'
+        orders_list_response = self.client.get(order_url)
+        self.assertEqual(orders_list_response.json()[0]['state'], 'new')

@@ -601,7 +601,7 @@ class ContactView(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if {'city', 'street', 'phone'}.issubset(request.data):
-            request.data._mutable = True
+            
             request.data.update({'user': request.user.id})
             serializer = ContactSerializer(data=request.data)
 
@@ -721,7 +721,7 @@ class OrderView(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if {'id', 'contact'}.issubset(request.data):
-            if request.data['id'].isdigit():
+            if isinstance(request.data['id'], int):
                 try:
                     is_updated = Order.objects.filter(
                         user_id=request.user.id, id=request.data['id']).update(
