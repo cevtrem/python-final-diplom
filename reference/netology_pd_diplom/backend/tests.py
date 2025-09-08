@@ -206,3 +206,40 @@ class APITests(APITestCase):
         # Verify order status is 'new'
         orders_list_response = self.client.get(order_url)
         self.assertEqual(orders_list_response.json()[0]['state'], 'new')
+
+    def test_view_created_orders(self):
+        """Проверяет просмотр созданных заказов."""
+        self.client.force_authenticate(user=self.buyer_user)
+        # Create an order first (reusing logic from test_confirm_order_with_address)
+        contact_url = reverse('backend:user-contact')
+        contact_data = {
+            'city': 'Москва',
+            'street': 'Ленина',
+            'phone': '+79001234567',
+            'house': '10',
+            'apartment': '5',
+        }
+        self.client.post(contact_url, contact_data, format='json')
+        contacts_list_response = self.client.get(contact_url)
+        contact_id = contacts_list_response.json()[0]['id']
+
+        basket_url = reverse('backend:basket')
+        items_data = [
+            {'product_info': self.product_info.id, 'quantity': 1},
+        ]
+        self.client.post(basket_url, {'items': json.dumps(items_data)}, format='json')
+        basket_get_response = self.client.get(basket_url)
+        basket_id = basket_get_response.json()[0]['id']
+
+        order_url = reverse('backend:order')
+        order_confirm_data = {
+            'id': basket_id,
+            'contact': contact_id,
+        }
+        self.client.post(order_url, order_confirm_data, format='json')
+
+        # Now, view the created orders
+        view_orders_response = self.client.get(order_url)
+        self.assertEqual(view_orders_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(view_orders_response.json()), 1) # Expecting one order
+        self.assertEqual(view_orders_response.json()[0]['state'], 'new')
