@@ -6,7 +6,7 @@ from backend.models import User, Shop, Category, Product, ProductInfo, ConfirmEm
 import yaml
 from django.db import transaction
 import json
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 
 class APITests(APITestCase):
@@ -286,4 +286,47 @@ class APITests(APITestCase):
         # Check positional arguments
         self.assertEqual(args[0], 'Обновление статуса заказа') # subject
         self.assertEqual(args[3], [self.buyer_user.email])   # to
+        
+    @patch('backend.views.get')
+    def test_partner_update_authorized(self, mock_get):
+        """Проверяет успешное обновление прайс-листа авторизованным магазином."""
+        # Create a new shop user for this test to avoid conflicts with setUp
+        new_shop_user = User.objects.create_user(email='newshop@example.com', password='password123', type='shop')
+
+        # Mock the response from requests.get
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"""
+shop: New Test Shop
+categories:
+  - id: 99999
+    name: New Category
+goods:
+  - id: 101
+    category: 99999
+    model: New Model S
+    name: New Product 1
+    price: 150.50
+    price_rrc: 160.00
+    quantity: 10
+    parameters:
+      param1: value1
+      param2: value2
+"""
+        mock_get.return_value = mock_response
+
+        self.client.force_authenticate(user=new_shop_user)
+        url = reverse('backend:partner-update')
+        data = {'url': 'http://example.com/new_price.yaml'}
+        response = self.client.post(url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.json()['Status'])
+
+        # Verify that the new product is in the database
+        self.assertTrue(ProductInfo.objects.filter(
+            shop__user=new_shop_user,
+            product__name='New Product 1',
+            model='New Model S'
+        ).exists())
         
