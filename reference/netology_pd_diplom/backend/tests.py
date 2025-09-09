@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
-from backend.models import User, Shop, Category, Product, ProductInfo, ConfirmEmailToken
+from backend.models import User, Shop, Category, Product, ProductInfo, ConfirmEmailToken, Contact, Order
 import yaml
 from django.db import transaction
 import json
@@ -15,6 +15,7 @@ class APITests(APITestCase):
         """Настраивает тестовые данные для всех тестов."""
         self.buyer_user = User.objects.create_user(email='buyer@example.com', password='password123', type='buyer')
         self.shop_user = User.objects.create_user(email='shop@example.com', password='password123', type='shop')
+        self.admin_user = User.objects.create_superuser(email='admin@example.com', password='adminpassword')
 
         with open('/home/mladinsky/Study/python-final-diplom/data/shop1.yaml', 'r') as file:
             data = yaml.safe_load(file)
@@ -299,19 +300,19 @@ class APITests(APITestCase):
         mock_response.content = b"""
 shop: New Test Shop
 categories:
-  - id: 99999
-    name: New Category
+- id: 99999
+  name: New Category
 goods:
-  - id: 101
-    category: 99999
-    model: New Model S
-    name: New Product 1
-    price: 150.50
-    price_rrc: 160.00
-    quantity: 10
-    parameters:
-      param1: value1
-      param2: value2
+- id: 101
+  category: 99999
+  model: New Model S
+  name: New Product 1
+  price: 150.50
+  price_rrc: 160.00
+  quantity: 10
+  parameters:
+    param1: value1
+    param2: value2
 """
         mock_get.return_value = mock_response
 
@@ -329,4 +330,52 @@ goods:
             product__name='New Product 1',
             model='New Model S'
         ).exists())
+        
+    @patch('backend.admin.EmailMultiAlternatives')
+    def test_admin_order_status_change_sends_email(self, mock_email):
+        """Проверяет, что при изменении статуса заказа в админке отправляется email."""
+        # Create an order for a buyer user
+        buyer_user = User.objects.create_user(email='admin_test_buyer@example.com', password='password123', type='buyer', first_name="Test", last_name="Buyer")
+        contact = Contact.objects.create(user=buyer_user, city='OrderTestCity', street='OrderTestStreet', phone='+9876543210')
+        order = Order.objects.create(user=buyer_user, state='new', contact=contact)
+
+        # Log in as a superuser (admin)
+        self.client.force_login(self.admin_user)
+
+        # Change the order status in the admin
+        change_url = reverse('admin:backend_order_change', args=[order.id])
+        
+        # Data for the POST request, mimicking a real admin form submission
+        post_data = {
+            'user': order.user.id,
+            'dt_0': order.dt.strftime('%Y-%m-%d'),  # Date part
+            'dt_1': order.dt.strftime('%H:%M:%S'),  # Time part
+            'state': 'confirmed',
+            'contact': order.contact.id,
+            'ordered_items-TOTAL_FORMS': 0,
+            'ordered_items-INITIAL_FORMS': 0,
+            'ordered_items-MIN_NUM_FORMS': 0,
+            'ordered_items-MAX_NUM_FORMS': 1000,
+            '_save': 'Save',  # This is crucial to trigger the save action
+        }
+        
+        response = self.client.post(change_url, post_data, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        # Check that we are on the changelist page and a success message is displayed
+        self.assertContains(response, 'was changed successfully.')
+
+        # Refresh the order from the database to check its new state
+        order.refresh_from_db()
+        self.assertEqual(order.state, 'confirmed')
+
+        # Check that the email was sent
+        mock_email.assert_called_once()
+        mock_email.return_value.send.assert_called_once()
+
+        # Check email content
+        args, kwargs = mock_email.call_args
+        self.assertEqual(args[0], f'Обновление статуса заказа {order.id}')  # Subject
+        self.assertIn(f'Статус вашего заказа №{order.id} изменен на: Подтвержден.', args[1])  # Body
+        self.assertEqual(args[3], [buyer_user.email])  # To
         

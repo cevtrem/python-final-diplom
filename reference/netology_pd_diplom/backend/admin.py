@@ -1,8 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
 
-from backend.models import User, Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
-    Contact, ConfirmEmailToken
+from backend.models import User, Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem,     Contact, ConfirmEmailToken, STATE_CHOICES
 
 
 @admin.register(User)
@@ -55,7 +56,28 @@ class ProductParameterAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('id', 'user', 'dt', 'state', 'contact')
+    list_filter = ('state',)
+    search_fields = ('user__email', 'id')
+
+    def save_model(self, request, obj, form, change):
+        # Check if the state has changed
+        if change and 'state' in form.changed_data:
+            # Send email notification
+            title = f'Обновление статуса заказа {obj.id}'
+            message = f'Уважаемый(ая) {obj.user.first_name} {obj.user.last_name},\n\n' \
+                      f'Статус вашего заказа №{obj.id} изменен на: {obj.get_state_display()}.\n\n' \
+                      f'С уважением,\nВаш магазин.'
+            email = obj.user.email
+
+            msg = EmailMultiAlternatives(
+                title,
+                message,
+                settings.EMAIL_HOST_USER,
+                [email]
+            )
+            msg.send()
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(OrderItem)
