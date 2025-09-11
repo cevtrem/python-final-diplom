@@ -54,11 +54,17 @@ class ProductParameterAdmin(admin.ModelAdmin):
     pass
 
 
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'dt', 'state', 'contact')
     list_filter = ('state',)
     search_fields = ('user__email', 'id')
+    inlines = [OrderItemInline]
 
     def save_model(self, request, obj, form, change):
         # Check if the state has changed
@@ -83,6 +89,7 @@ class OrderAdmin(admin.ModelAdmin):
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
     pass
+
 
 
 @admin.register(Contact)
