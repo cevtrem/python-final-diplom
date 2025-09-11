@@ -278,15 +278,20 @@ class APITests(APITestCase):
         self.client.post(order_url, order_confirm_data, format='json')
 
         # 4. Assert that the email was sent
-        mock_email.assert_called_once()
-        mock_email.return_value.send.assert_called_once()
+        self.assertEqual(mock_email.call_count, 2)
 
-        # call_args is a tuple of (args, kwargs)
-        args, kwargs = mock_email.call_args
-        
-        # Check positional arguments
+        # Check user email
+        user_email_call = mock_email.call_args_list[0]
+        args, kwargs = user_email_call
         self.assertEqual(args[0], 'Обновление статуса заказа') # subject
-        self.assertEqual(args[3], [self.buyer_user.email])   # to
+        self.assertEqual(args[3], [self.buyer_user.email])
+
+        # Check admin email
+        admin_email_call = mock_email.call_args_list[1]
+        args, kwargs = admin_email_call
+        self.assertIn('Новый заказ', args[0])  # Subject
+        self.assertIn('Поступил новый заказ', args[1])  # Body
+        self.assertEqual(args[3], [self.admin_user.email])
         
     @patch('backend.views.get')
     def test_partner_update_authorized(self, mock_get):
