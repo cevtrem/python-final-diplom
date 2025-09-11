@@ -26,37 +26,56 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('name', 'user', 'state')
+    list_filter = ('state',)
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    pass
+    search_fields = ('name',)
 
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('name', 'category')
+    list_filter = ('category',)
+
+
+class ProductParameterInline(admin.TabularInline):
+    model = ProductParameter
+    extra = 0
 
 
 @admin.register(ProductInfo)
 class ProductInfoAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('product', 'shop', 'price', 'quantity')
+    list_filter = ('shop',)
+    inlines = [ProductParameterInline]
 
 
 @admin.register(Parameter)
 class ParameterAdmin(admin.ModelAdmin):
-    pass
+    search_fields = ('name',)
 
 
 @admin.register(ProductParameter)
 class ProductParameterAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('product_info', 'parameter', 'value')
 
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
+    readonly_fields = ('category_name', 'price')
+    fields = ('product_info', 'category_name', 'price', 'quantity')
+
+    def category_name(self, obj):
+        return obj.product_info.product.category.name
+    category_name.short_description = 'Категория'
+
+    def price(self, obj):
+        return obj.product_info.price
+    price.short_description = 'Цена'
 
 
 @admin.register(Order)
@@ -88,13 +107,14 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('order', 'product_info', 'quantity')
 
 
 
 @admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('user', 'city', 'street', 'phone')
+    search_fields = ('user__email',)
 
 
 @admin.register(ConfirmEmailToken)
