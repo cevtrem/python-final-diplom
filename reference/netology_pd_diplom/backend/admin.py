@@ -1,6 +1,6 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
-from django.core.mail import EmailMultiAlternatives
+from .tasks import send_email_task, do_import
 from django.conf import settings
 
 from backend.models import User, Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem,     Contact, ConfirmEmailToken, STATE_CHOICES
@@ -28,6 +28,30 @@ class CustomUserAdmin(UserAdmin):
 class ShopAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'state')
     list_filter = ('state',)
+    actions = ['update_pricelist']
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'user', 'state'),
+        }),
+        ('Импорт', {
+            'fields': ('url',),
+        }),
+    )
+
+    def update_pricelist(self, request, queryset):
+        """_summary_
+
+        Args:
+            request (_type_): _description_
+            queryset (_type_): _description_
+        """        
+        for shop in queryset:
+            if shop.url:
+                do_import.delay(shop.url, shop.id)
+                self.message_user(request, f'Прайс-лист для магазина "{shop.name}" будет обновлен в ближайшее время.', messages.SUCCESS)
+            else:
+                self.message_user(request, f'У магазина "{shop.name}" не указан URL для импорта.', messages.WARNING)
+    update_pricelist.short_description = "Обновить прайс-лист"
 
 
 @admin.register(Category)
@@ -88,20 +112,19 @@ class OrderAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         # Check if the state has changed
         if change and 'state' in form.changed_data:
-            # Send email notification
             title = f'Обновление статуса заказа {obj.id}'
-            message = f'Уважаемый(ая) {obj.user.first_name} {obj.user.last_name},\n\n' \
-                      f'Статус вашего заказа №{obj.id} изменен на: {obj.get_state_display()}.\n\n' \
-                      f'С уважением,\nВаш магазин.'
-            email = obj.user.email
+            message = f"""Уважаемый(ая) {obj.user.first_name} {obj.user.last_name},
 
-            msg = EmailMultiAlternatives(
-                title,
-                message,
-                settings.EMAIL_HOST_USER,
-                [email]
+Статус вашего заказа №{obj.id} изменен на: {obj.get_state_display()}.
+
+С уважением,
+Ваш магазин."""
+
+            send_email_task.delay(
+                subject=title,
+                message=message,
+                recipient_list=[obj.user.email]
             )
-            msg.send()
         super().save_model(request, obj, form, change)
 
 

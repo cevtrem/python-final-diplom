@@ -1,13 +1,13 @@
 from typing import Type
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.db.models import Sum, F
 from django.db.models.signals import post_save
 from django.dispatch import receiver, Signal
 from django_rest_passwordreset.signals import reset_password_token_created
 
 from backend.models import ConfirmEmailToken, User, Order
+from backend.tasks import send_email_task
 
 new_user_registered = Signal()
 
@@ -26,18 +26,11 @@ def password_reset_token_created(sender, instance, reset_password_token, **kwarg
     :return:
     """
     # send an e-mail to the user
-
-    msg = EmailMultiAlternatives(
-        # title:
-        f"Password Reset Token for {reset_password_token.user}",
-        # message:
-        reset_password_token.key,
-        # from:
-        settings.EMAIL_HOST_USER,
-        # to:
-        [reset_password_token.user.email]
+    send_email_task.delay(
+        subject=f"Password Reset Token for {reset_password_token.user}",
+        message=reset_password_token.key,
+        recipient_list=[reset_password_token.user.email]
     )
-    msg.send()
 
 
 @receiver(post_save, sender=User)
@@ -49,17 +42,11 @@ def new_user_registered_signal(sender: Type[User], instance: User, created: bool
         # send an e-mail to the user
         token, _ = ConfirmEmailToken.objects.get_or_create(user_id=instance.pk)
 
-        msg = EmailMultiAlternatives(
-            # title:
-            f"Password Reset Token for {instance.email}",
-            # message:
-            token.key,
-            # from:
-            settings.EMAIL_HOST_USER,
-            # to:
-            [instance.email]
+        send_email_task.delay(
+            subject=f"Password Reset Token for {instance.email}",
+            message=token.key,
+            recipient_list=[instance.email]
         )
-        msg.send()
 
 
 @receiver(new_order)
@@ -70,17 +57,11 @@ def new_order_signal(user_id, **kwargs):
     # send an e-mail to the user
     user = User.objects.get(id=user_id)
 
-    msg = EmailMultiAlternatives(
-        # title:
-        f"Обновление статуса заказа",
-        # message:
-        'Заказ сформирован',
-        # from:
-        settings.EMAIL_HOST_USER,
-        # to:
-        [user.email]
+    send_email_task.delay(
+        subject=f"Обновление статуса заказа",
+        message='Заказ сформирован',
+        recipient_list=[user.email]
     )
-    msg.send()
 
     # and send email to admins
     admins = User.objects.filter(is_superuser=True)
@@ -98,14 +79,8 @@ def new_order_signal(user_id, **kwargs):
     for item in order.ordered_items.all():
         admin_message += f'- {item.product_info.product.name} ({item.quantity} шт.)\n'
 
-    msg_admin = EmailMultiAlternatives(
-        # title:
-        f"Новый заказ №{order.id}",
-        # message:
-        admin_message,
-        # from:
-        settings.EMAIL_HOST_USER,
-        # to:
-        admin_emails
+    send_email_task.delay(
+        subject=f"Новый заказ №{order.id}",
+        message=admin_message,
+        recipient_list=admin_emails
     )
-    msg_admin.send()

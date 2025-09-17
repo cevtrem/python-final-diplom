@@ -1,0 +1,27 @@
+shop: 'Test Shop'
+categories:
+  - id: 1
+    name: 'Телефоны'
+  - id: 2
+    name: 'Ноутбуки'
+goods:
+  - id: 101
+    category: 1
+    model: 'iPhone 15'
+    name: 'Смартфон Apple iPhone 15'
+    price: 150000
+    price_rrc: 160000
+    quantity: 10
+    parameters:
+      diagonal: '6.1"'
+      memory: '256GB'
+  - id: 102
+    category: 2
+    model: 'MacBook Air 13'
+    name: 'Ноутбук Apple MacBook Air 13 M2'
+    price: 250000
+    price_rrc: 260000
+    quantity: 5
+    parameters:
+      diagonal: '13.6"'
+      memory: '512GB'
