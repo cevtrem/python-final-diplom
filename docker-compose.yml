@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    restart: always
+
+  backend:
+    build: .
+    restart: always
+    command: python manage.py runserver 0.0.0.0:8000
+    working_dir: /app/reference/netology_pd_diplom
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      - EMAIL_HOST=smtp.example.com
+      - EMAIL_PORT=587
+      - EMAIL_USE_SSL=False
+      - EMAIL_HOST_USER=user@example.com
+      - EMAIL_HOST_PASSWORD=password
+
+  celery:
+    build: .
+    restart: always
+    command: celery -A netology_pd_diplom worker -l info
+    working_dir: /app/reference/netology_pd_diplom
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - backend
+    environment:
+      - EMAIL_HOST=smtp.example.com
+      - EMAIL_PORT=587
+      - EMAIL_USE_SSL=False
+      - EMAIL_HOST_USER=user@example.com
+      - EMAIL_HOST_PASSWORD=password
