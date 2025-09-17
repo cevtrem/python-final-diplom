@@ -1,17 +1,19 @@
 version: '3.8'
 
 services:
+  # Сервис Redis, используется как брокер сообщений для Celery
   redis:
     image: redis:alpine
     restart: always
 
+  # Сервис Django-приложения
   backend:
     build: .
     restart: always
     command: python manage.py runserver 0.0.0.0:8000
     working_dir: /app/reference/netology_pd_diplom
     volumes:
-      - .:/app
+      - .:/app  # Пробрасываем текущую директорию в /app внутри контейнера для live-reload
     ports:
       - "8000:8000"
     depends_on:
@@ -23,6 +25,7 @@ services:
       - EMAIL_HOST_USER=user@example.com
       - EMAIL_HOST_PASSWORD=password
 
+  # Сервис Celery worker для выполнения асинхронных задач
   celery:
     build: .
     restart: always

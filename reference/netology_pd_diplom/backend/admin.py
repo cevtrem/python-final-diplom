@@ -38,20 +38,18 @@ class ShopAdmin(admin.ModelAdmin):
         }),
     )
 
+    @admin.action(description='Обновить прайс-лист')
     def update_pricelist(self, request, queryset):
-        """_summary_
-
-        Args:
-            request (_type_): _description_
-            queryset (_type_): _description_
-        """        
+        """
+        Запускает асинхронную задачу для обновления прайс-листа
+        для каждого выбранного магазина.
+        """
         for shop in queryset:
             if shop.url:
                 do_import.delay(shop.url, shop.id)
                 self.message_user(request, f'Прайс-лист для магазина "{shop.name}" будет обновлен в ближайшее время.', messages.SUCCESS)
             else:
                 self.message_user(request, f'У магазина "{shop.name}" не указан URL для импорта.', messages.WARNING)
-    update_pricelist.short_description = "Обновить прайс-лист"
 
 
 @admin.register(Category)
@@ -120,6 +118,7 @@ class OrderAdmin(admin.ModelAdmin):
 С уважением,
 Ваш магазин."""
 
+            # Вызываем асинхронную задачу для отправки письма
             send_email_task.delay(
                 subject=title,
                 message=message,
