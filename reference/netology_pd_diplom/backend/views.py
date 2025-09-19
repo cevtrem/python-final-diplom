@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ujson import loads as load_json
 from yaml import load as load_yaml, Loader
+import logging
 
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem,     Contact, ConfirmEmailToken
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer,     OrderItemSerializer, OrderSerializer, ContactSerializer
@@ -40,7 +41,6 @@ class RegisterAccount(APIView):
         if {'first_name', 'last_name', 'email', 'password', 'company', 'position'}.issubset(request.data):
 
             # проверяем пароль на сложность
-            sad = 'asd'
             try:
                 validate_password(request.data['password'])
             except Exception as password_error:
@@ -656,7 +656,7 @@ class ContactView(APIView):
         if 'id' in request.data:
             if request.data['id'].isdigit():
                 contact = Contact.objects.filter(id=request.data['id'], user_id=request.user.id).first()
-                print(contact)
+                logging.info(contact)
                 if contact:
                     serializer = ContactSerializer(contact, data=request.data, partial=True)
                     if serializer.is_valid():
@@ -725,7 +725,7 @@ class OrderView(APIView):
                         contact_id=request.data['contact'],
                         state='new')
                 except IntegrityError as error:
-                    print(error)
+                    logging.error(error)
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
