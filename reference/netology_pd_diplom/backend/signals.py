@@ -1,6 +1,5 @@
 from typing import Type
 
-from django.conf import settings
 from django.db.models import Sum, F
 from django.db.models.signals import post_save
 from django.dispatch import receiver, Signal
@@ -58,7 +57,7 @@ def new_order_signal(user_id, **kwargs):
     user = User.objects.get(id=user_id)
 
     send_email_task.delay(
-        subject=f"Обновление статуса заказа",
+        subject="Обновление статуса заказа",
         message='Заказ сформирован',
         recipient_list=[user.email]
     )

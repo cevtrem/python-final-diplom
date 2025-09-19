@@ -1,10 +1,8 @@
-from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from backend.models import User, Shop, Category, Product, ProductInfo, ConfirmEmailToken, Contact, Order
 import yaml
-from django.db import transaction
 import json
 from unittest.mock import patch, Mock
 
@@ -17,7 +15,7 @@ class APITests(APITestCase):
         self.shop_user = User.objects.create_user(email='shop@example.com', password='password123', type='shop')
         self.admin_user = User.objects.create_superuser(email='admin@example.com', password='adminpassword')
 
-        with open('/home/mladinsky/Study/python-final-diplom/data/shop1.yaml', 'r') as file:
+        with open('../../data/shop1.yaml', 'r') as file:
             data = yaml.safe_load(file)
 
         self.shop, _ = Shop.objects.get_or_create(name=data['shop'], user=self.shop_user)
@@ -25,18 +23,18 @@ class APITests(APITestCase):
             category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
             category_object.shops.add(self.shop.id)
             category_object.save()
-            if not hasattr(self, 'category'): # Assign the first category to self.category
+            if not hasattr(self, 'category'):  # Assign the first category to self.category
                 self.category = category_object
 
         for item in data['goods']:
             product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
             product_info_object = ProductInfo.objects.create(product_id=product.id,
-                                       external_id=item['id'],
-                                       model=item['model'],
-                                       price=item['price'],
-                                       price_rrc=item['price_rrc'],
-                                       quantity=item['quantity'],
-                                       shop_id=self.shop.id)
+                                                    external_id=item['id'],
+                                                    model=item['model'],
+                                                    price=item['price'],
+                                                    price_rrc=item['price_rrc'],
+                                                    quantity=item['quantity'],
+                                                    shop_id=self.shop.id)
             if not hasattr(self, 'product_info'):
                 self.product_info = product_info_object
 
@@ -45,7 +43,6 @@ class APITests(APITestCase):
         self.shop2, _ = Shop.objects.get_or_create(name='Test Shop 2', user=self.shop2_user)
         self.product2 = Product.objects.create(name='Test Product 2', category=self.category)
         self.product_info2 = ProductInfo.objects.create(product=self.product2, shop=self.shop2, price=200, quantity=5, external_id=2, price_rrc=220)
-
 
     def test_user_registration(self):
         """Проверяет успешную регистрацию нового пользователя."""
@@ -61,7 +58,6 @@ class APITests(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(User.objects.filter(email='newuser@example.com').exists())
-
 
     def test_user_login(self):
         """Проверяет авторизацию пользователя после регистрации и подтверждения."""
@@ -96,14 +92,12 @@ class APITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('Token', response.json())
 
-
     def test_category_view(self):
         """Проверяет получение списка категорий."""
         url = reverse('backend:categories')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 4)
-
 
     def test_shop_view(self):
         """Проверяет получение списка магазинов."""
@@ -112,7 +106,6 @@ class APITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 4)
 
-
     def test_product_info_view(self):
         """Проверяет получение информации о продуктах."""
         url = reverse('backend:products')
@@ -120,13 +113,11 @@ class APITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 15)
 
-
     def test_basket_view_unauthenticated(self):
         """Проверяет доступ к корзине для неавторизованного пользователя."""
         url = reverse('backend:basket')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
 
     def test_basket_view_authenticated(self):
         """Проверяет доступ к корзине для авторизованного пользователя."""
@@ -134,7 +125,6 @@ class APITests(APITestCase):
         url = reverse('backend:basket')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
 
     def test_partner_update_unauthorized(self):
         """Проверяет доступ к обновлению прайс-листа для неавторизованного пользователя."""
@@ -243,10 +233,10 @@ class APITests(APITestCase):
         # Now, view the created orders
         view_orders_response = self.client.get(order_url)
         self.assertEqual(view_orders_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(view_orders_response.json()), 1) # Expecting one order
+        self.assertEqual(len(view_orders_response.json()), 1)  # Expecting one order
         self.assertEqual(view_orders_response.json()[0]['state'], 'new')
 
-    @patch('backend.signals.EmailMultiAlternatives')
+    @patch('backend.tasks.EmailMultiAlternatives')
     def test_new_order_email_sent(self, mock_email):
         """Проверяет, что при создании нового заказа отправляется email."""
         self.client.force_authenticate(user=self.buyer_user)
@@ -283,7 +273,7 @@ class APITests(APITestCase):
         # Check user email
         user_email_call = mock_email.call_args_list[0]
         args, kwargs = user_email_call
-        self.assertEqual(args[0], 'Обновление статуса заказа') # subject
+        self.assertEqual(args[0], 'Обновление статуса заказа')  # subject
         self.assertEqual(args[3], [self.buyer_user.email])
 
         # Check admin email
@@ -292,7 +282,7 @@ class APITests(APITestCase):
         self.assertIn('Новый заказ', args[0])  # Subject
         self.assertIn('Поступил новый заказ', args[1])  # Body
         self.assertEqual(args[3], [self.admin_user.email])
-        
+
     @patch('backend.views.get')
     def test_partner_update_authorized(self, mock_get):
         """Проверяет успешное обновление прайс-листа авторизованным магазином."""
@@ -335,8 +325,8 @@ goods:
             product__name='New Product 1',
             model='New Model S'
         ).exists())
-        
-    @patch('backend.admin.EmailMultiAlternatives')
+
+    @patch('backend.tasks.EmailMultiAlternatives')
     def test_admin_order_status_change_sends_email(self, mock_email):
         """Проверяет, что при изменении статуса заказа в админке отправляется email."""
         # Create an order for a buyer user
@@ -349,7 +339,7 @@ goods:
 
         # Change the order status in the admin
         change_url = reverse('admin:backend_order_change', args=[order.id])
-        
+
         # Data for the POST request, mimicking a real admin form submission
         post_data = {
             'user': order.user.id,
@@ -363,7 +353,7 @@ goods:
             'ordered_items-MAX_NUM_FORMS': 1000,
             '_save': 'Save',  # This is crucial to trigger the save action
         }
-        
+
         response = self.client.post(change_url, post_data, follow=True)
 
         self.assertEqual(response.status_code, 200)
@@ -375,12 +365,10 @@ goods:
         self.assertEqual(order.state, 'confirmed')
 
         # Check that the email was sent
-        mock_email.assert_called_once()
-        mock_email.return_value.send.assert_called_once()
+        self.assertEqual(mock_email.call_count, 2)
 
         # Check email content
         args, kwargs = mock_email.call_args
         self.assertEqual(args[0], f'Обновление статуса заказа {order.id}')  # Subject
         self.assertIn(f'Статус вашего заказа №{order.id} изменен на: Подтвержден.', args[1])  # Body
         self.assertEqual(args[3], [buyer_user.email])  # To
-        

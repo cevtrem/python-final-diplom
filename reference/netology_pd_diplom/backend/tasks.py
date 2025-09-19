@@ -28,7 +28,7 @@ def do_import(url, shop_id):
     """
     Асинхронная задача для импорта товаров из YAML-файла.
     Загружает данные по URL, обрабатывает их и обновляет каталог товаров магазина.
-    
+
     Args:
         url (str): URL или путь к файлу с прайс-листом.
         shop_id (int): ID магазина, для которого выполняется импорт.
@@ -43,7 +43,7 @@ def do_import(url, shop_id):
                     stream = f.read()
             else:
                 stream = get(url).content
-            
+
             data = load_yaml(stream, Loader=Loader)
 
             shop = Shop.objects.get(id=shop_id)
@@ -53,7 +53,7 @@ def do_import(url, shop_id):
             # при повторных импортах, обновляя существующие записи.
             for category_data in data['categories']:
                 category, _ = Category.objects.update_or_create(
-                    id=category_data['id'], 
+                    id=category_data['id'],
                     defaults={'name': category_data['name']}
                 )
                 category.shops.add(shop.id)
@@ -62,7 +62,7 @@ def do_import(url, shop_id):
             # Перед импортом новых товаров, удаляем все старые товары этого магазина,
             # чтобы поддерживать каталог в актуальном состоянии.
             ProductInfo.objects.filter(shop_id=shop.id).delete()
-            
+
             # Создаем новые товары и их характеристики.
             for item in data['goods']:
                 product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])

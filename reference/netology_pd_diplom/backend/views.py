@@ -17,7 +17,7 @@ import logging
 
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem,     Contact, ConfirmEmailToken
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer,     OrderItemSerializer, OrderSerializer, ContactSerializer
-from backend.signals import new_user_registered, new_order
+from backend.signals import new_order
 
 
 class RegisterAccount(APIView):
@@ -142,7 +142,6 @@ class AccountDetails(APIView):
         # проверяем обязательные аргументы
 
         if 'password' in request.data:
-            errors = {}
             # проверяем пароль на сложность
             try:
                 validate_password(request.data['password'])
@@ -383,7 +382,7 @@ class BasketView(APIView):
                 basket, _ = Order.objects.get_or_create(user_id=request.user.id, state='basket')
                 objects_updated = 0
                 for order_item in items_dict:
-                    if type(order_item['id']) == int and type(order_item['quantity']) == int:
+                    if isinstance(order_item['id'], int) and isinstance(order_item['quantity'], int):
                         objects_updated += OrderItem.objects.filter(order_id=basket.id, id=order_item['id']).update(
                             quantity=order_item['quantity'])
 
@@ -598,7 +597,6 @@ class ContactView(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if {'city', 'street', 'phone'}.issubset(request.data):
-            
             request.data.update({'user': request.user.id})
             serializer = ContactSerializer(data=request.data)
 

@@ -103,7 +103,7 @@ class User(AbstractUser):
 class Shop(models.Model):
     objects = models.manager.Manager()
     name = models.CharField(max_length=50, verbose_name='Название')
-    url = models.CharField(max_length=200, verbose_name='Ссылка', null=True, blank=True)
+    url = models.CharField(max_length=200, verbose_name='Ссылка', blank=True)
     user = models.OneToOneField(User, verbose_name='Пользователь',
                                 blank=True, null=True,
                                 on_delete=models.CASCADE)
@@ -201,6 +201,9 @@ class ProductParameter(models.Model):
             models.UniqueConstraint(fields=['product_info', 'parameter'], name='unique_product_parameter'),
         ]
 
+    def __str__(self):
+        return f'{self.parameter.name}: {self.value}'
+
 
 class Contact(models.Model):
     objects = models.manager.Manager()
@@ -265,9 +268,13 @@ class OrderItem(models.Model):
             models.UniqueConstraint(fields=['order_id', 'product_info'], name='unique_order_item'),
         ]
 
+    def __str__(self):
+        return f'{self.product_info} (x{self.quantity})'
+
 
 class ConfirmEmailToken(models.Model):
     objects = models.manager.Manager()
+    
     class Meta:
         verbose_name = 'Токен подтверждения Email'
         verbose_name_plural = 'Токены подтверждения Email'

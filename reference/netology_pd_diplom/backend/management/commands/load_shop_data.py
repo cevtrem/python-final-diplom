@@ -3,6 +3,7 @@ import yaml
 from django.core.management.base import BaseCommand
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, User
 
+
 class Command(BaseCommand):
     help = 'Load shop data from a YAML file'
 
